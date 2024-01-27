@@ -1,0 +1,14 @@
+{
+  "name": "Wired Batteries",
+  "author": "Aidanamite",
+  "description": "Adds a new wiring system for electrical machines on the raft",
+  "version": "1.0.10",
+  "license": "GNU AGPLv3",
+  "icon": "icon.png",
+  "banner": "banner.jpg",
+  "gameVersion": "1.0",
+  "requiredByAllPlayers": true,
+  "updateUrl": "https://www.raftmodding.com/api/v1/mods/wired-batteries/version.txt",
+  "isModPermanent": false,
+  "excludedFiles": []
+}
