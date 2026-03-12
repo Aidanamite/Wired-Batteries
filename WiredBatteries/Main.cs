@@ -363,7 +363,7 @@ namespace WiredBatteries
     {
         public Battery[] batteries;
         public MeshPathBase_RaftElectricity pathBase;
-        public override bool Deserialize(Message_NetworkBehaviour msg, CSteamID remoteID)
+        public override bool Deserialize(Message_NetworkBehaviour msg, Network_UserId remoteID)
         {
             switch (msg.Type)
             {
@@ -389,7 +389,7 @@ namespace WiredBatteries
             placed = true;
             NetworkIDManager.AddNetworkID(this);
         }
-        protected override void OnDestroy()
+        public override void OnDestroy()
         {
             base.OnDestroy();
             if (placed)
@@ -955,16 +955,14 @@ namespace WiredBatteries
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var code = instructions.ToList();
-            var loc5 = code.Find(x => x.opcode == OpCodes.Stloc_S && (x.operand as LocalBuilder).LocalIndex == 5).operand;
-            var loc6 = code.Find(x => x.opcode == OpCodes.Stloc_S && (x.operand as LocalBuilder).LocalIndex == 6).operand;
             code.InsertRange(code.FindIndex(x => x.opcode == OpCodes.Ldsfld && (x.operand as FieldInfo).Name == "MeshPathCreationIsObstructed") + 1, new[] {
-                new CodeInstruction(OpCodes.Ldloc_3),
-                new CodeInstruction(OpCodes.Ldloc_S, loc5),
-                new CodeInstruction(OpCodes.Ldloc_S, loc6),
+                new CodeInstruction(OpCodes.Ldloc_S, 4),
+                new CodeInstruction(OpCodes.Ldloc_S, 6),
+                new CodeInstruction(OpCodes.Ldloc_S, 7),
                 new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Patch_ZiplinePlacement),nameof(SkipCollisionCheck)))
             });
             code.InsertRange(code.FindIndex(x => x.opcode == OpCodes.Ldfld && (x.operand as FieldInfo).Name == "minDistanceFromGround") + 1, new[] {
-                new CodeInstruction(OpCodes.Ldloc_3),
+                new CodeInstruction(OpCodes.Ldloc_S, 4),
                 new CodeInstruction(OpCodes.Call,AccessTools.Method(typeof(Patch_ZiplinePlacement), nameof(Process)))
             });
             return code;
@@ -1206,8 +1204,8 @@ namespace WiredBatteries
         {
             try { 
                 var msg = SaveHandler.CreateObject<Message_BlockCreator_Create>();
-                msg.Type = ~Messages.NOTHING;
-                msg.ObjectIndex = 0;
+                msg.Type = Messages.BlockCreator_Create;
+                msg.ObjectIndex = uint.MaxValue-1;
                 msg.rgdBlocks = new[] { SaveHandler.CreateSave() };
                 var i = game.FindIndex(x => x.Type == Messages.MeshPath_CreateAll);
                 game.Insert(i == -1 ? game.Count - 1 : i,msg);
@@ -1218,30 +1216,21 @@ namespace WiredBatteries
             }
         }
     }
-    [HarmonyPatch(typeof(NetworkUpdateManager), "Deserialize")]
+    [HarmonyPatch(typeof(NetworkUpdateManager), "DeserializeSingleMessage")]
     static class Patch_RecieveWorld
     {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var code = instructions.ToList();
-            var ind = code.FindIndex(x => x.opcode == OpCodes.Stloc_2);
-            code.InsertRange(ind, new[] {
-                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Patch_RecieveWorld), nameof(OnRecieve)))
-            });
-            return code;
-        }
-        static Message OnRecieve(Message msg)
+        static bool Prefix(Message msg)
         {
             var message = msg as Message_BlockCreator_Create;
             try {
-                if (message != null && msg.Type == ~Messages.NOTHING && message.ObjectIndex == 0 && message.rgdBlocks?.Length == 1 && SaveHandler.Load(message.rgdBlocks[0]))
-                    return null;
+                if (message != null && message.ObjectIndex == uint.MaxValue-1 && message.rgdBlocks?.Length == 1 && SaveHandler.Load(message.rgdBlocks[0]))
+                    return false;
             }
             catch (Exception e)
             {
                 Debug.LogError(e);
             }
-            return msg;
+            return true;
         }
     }
 
