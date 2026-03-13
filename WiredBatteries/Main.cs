@@ -474,11 +474,12 @@ namespace WiredBatteries
     {
         public const short OwnId = 0;
         public static RGDType SubId = new RGD(~RGDType.None, default).Type;
+        public static RGDType NetworkSubId = new RGD(RGDType.Block_Storage, default).Type;
         public static Dictionary<uint, RGD_Slot> waiting = new Dictionary<uint, RGD_Slot>();
-        public static RGD_Block CreateSave(params uint[] specificObjects)
+        public static RGD_Block CreateSave(bool networking, params uint[] specificObjects)
         {
             var d = CreateObject<RGD_Storage>();
-            d.Type = SubId;
+            d.Type = networking ? NetworkSubId : SubId;
             var l = new List<RGD_Slot>();
             l.Add(CreateObject<RGD_Slot>());
             l[0].slotIndex = OwnId;
@@ -498,10 +499,10 @@ namespace WiredBatteries
             d.slots = l.ToArray();
             return d;
         }
-        public static bool Load(RGD_Block data)
+        public static bool Load(RGD_Block data, bool networking)
         {
             var d = data as RGD_Storage;
-            if (d?.slots != null && d.slots.Length > 0 && d.slots[0].slotIndex == OwnId && d.Type == SubId)
+            if (d?.slots != null && d.slots.Length > 0 && d.slots[0].slotIndex == OwnId && d.Type == (networking ? NetworkSubId : SubId))
             {
                 var o = Resources.FindObjectsOfTypeAll<MonoBehaviour_ID>();
                 var skip = true;
@@ -1150,7 +1151,7 @@ namespace WiredBatteries
                 foreach (var b in game.behaviours)
                     try
                     {
-                        if (SaveHandler.Load(b as RGD_Block))
+                        if (SaveHandler.Load(b as RGD_Block, false))
                             break;
                     } catch (Exception e)
                     {
@@ -1177,7 +1178,7 @@ namespace WiredBatteries
         {
             try
             {
-                game.behaviours?.Add(SaveHandler.CreateSave());
+                game.behaviours?.Add(SaveHandler.CreateSave(false));
             } catch (Exception e)
             {
                 Debug.LogError(e);
@@ -1206,7 +1207,7 @@ namespace WiredBatteries
                 var msg = SaveHandler.CreateObject<Message_BlockCreator_Create>();
                 msg.Type = Messages.BlockCreator_Create;
                 msg.ObjectIndex = uint.MaxValue-1;
-                msg.rgdBlocks = new[] { SaveHandler.CreateSave() };
+                msg.rgdBlocks = new[] { SaveHandler.CreateSave(true) };
                 var i = game.FindIndex(x => x.Type == Messages.MeshPath_CreateAll);
                 game.Insert(i == -1 ? game.Count - 1 : i,msg);
             }
@@ -1223,7 +1224,7 @@ namespace WiredBatteries
         {
             var message = msg as Message_BlockCreator_Create;
             try {
-                if (message != null && message.ObjectIndex == uint.MaxValue-1 && message.rgdBlocks?.Length == 1 && SaveHandler.Load(message.rgdBlocks[0]))
+                if (message != null && message.ObjectIndex == uint.MaxValue-1 && message.rgdBlocks?.Length == 1 && SaveHandler.Load(message.rgdBlocks[0], true))
                     return false;
             }
             catch (Exception e)
@@ -1284,9 +1285,9 @@ namespace WiredBatteries
             if (Raft_Network.IsHost)
             {
                 var msg = SaveHandler.CreateObject<Message_BlockCreator_Create>();
-                msg.Type = ~Messages.NOTHING;
-                msg.ObjectIndex = 0;
-                msg.rgdBlocks = new[] { SaveHandler.CreateSave(__instance.ObjectIndex) };
+                msg.Type = Messages.BlockCreator_Create;
+                msg.ObjectIndex = uint.MaxValue - 1;
+                msg.rgdBlocks = new[] { SaveHandler.CreateSave(true, __instance.ObjectIndex) };
                 ComponentManager<Raft_Network>.Value.RPC(msg, Target.Other, EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
             }
             else if (SaveHandler.waiting.TryGetValue(__instance.ObjectIndex, out var r))
